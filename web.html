@@ -1,0 +1,268 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ChatApp</title>
+    <script src="https://cdn.jsdelivr.net/npm/web3@1.5.3/dist/web3.min.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.6.4/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.6.4/firebase-database-compat.js"></script>
+
+</head>
+<body>
+  <style>
+    body {
+        font-family: Arial, sans-serif;
+        margin: 0;
+        padding: 0;
+        background-color: #f0f0f0;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        height: 100vh;
+    }
+
+    .container {
+        max-width: 600px;
+        width: 100%;
+        background-color: #fff;
+        border-radius: 10px;
+        box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+        padding: 20px;
+    }
+
+    h1 {
+        text-align: center;
+        margin-bottom: 20px;
+    }
+
+    #messageContent {
+        width: 100%;
+        box-sizing: border-box;
+        padding: 10px;
+        margin-bottom: 10px;
+        border: 1px solid #ccc;
+        border-radius: 5px;
+        resize: none;
+        min-height: 100px;
+    }
+
+    button {
+        background-color: #4CAF50;
+        color: white;
+        padding: 10px 20px;
+        border: none;
+        border-radius: 5px;
+        cursor: pointer;
+        font-size: 16px;
+    }
+
+    button:hover {
+        background-color: #45a049;
+    }
+
+    #messages {
+        margin-top: 20px;
+    }
+
+    .message {
+        background-color: #f9f9f9;
+        border-radius: 5px;
+        padding: 10px;
+        margin-bottom: 10px;
+    }
+
+    .message p {
+        margin: 5px 0;
+    }
+
+</style>
+    <h1>ChatApp</h1>
+    
+    <textarea id="messageContent" placeholder="Type your message here..."></textarea>
+    <button onclick="sendMessage()">Send Message</button>
+    
+    <div id="messages"></div>
+
+    <script>
+        // Firebase configuration
+        const firebaseConfig = {
+          apiKey: "AIzaSyAb9YxQ2EG-XeTnjq-m92aTYRckxhSBvSM",
+  authDomain: "chatapp-5439f.firebaseapp.com",
+  databaseURL: "https://chatapp-5439f-default-rtdb.firebaseio.com",
+  projectId: "chatapp-5439f",
+  storageBucket: "chatapp-5439f.appspot.com",
+  messagingSenderId: "549886991335",
+  appId: "1:549886991335:web:9697a929a925d84cf67b42",
+  measurementId: "G-6CZQKQZD69"
+};
+
+       // Initialize Firebase
+       firebase.initializeApp(firebaseConfig);
+
+// Initialize Realtime Database
+const database = firebase.database();
+
+        // Contract address and ABI
+        const contractAddress = '0x82D9463E4E03b21375C11FaFbD04A4E63A990E33';
+        const contractABI = [
+      {
+      "anonymous": false,
+      "inputs": [
+        {
+          "indexed": true,
+          "internalType": "address",
+          "name": "sender",
+          "type": "address"
+        },
+        {
+          "indexed": false,
+          "internalType": "string",
+          "name": "content",
+          "type": "string"
+        },
+        {
+          "indexed":     false,
+          "internalType": "uint256",
+          "name": "timestamp",
+          "type": "uint256"
+        }
+      ],
+      "name": "MessageSent",
+      "type": "event"
+    },
+    {
+      "constant": true,
+      "inputs": [],
+      "name": "messageCount",
+      "outputs": [
+        {
+          "internalType": "uint256",
+          "name": "",
+          "type": "uint256"
+        }
+      ],
+      "payable": false,
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "constant": true,
+      "inputs": [
+        {
+          "internalType": "uint256",
+          "name": "",
+          "type": "uint256"
+        }
+      ],
+      "name": "messages",
+      "outputs": [
+        {
+          "internalType": "address",
+          "name": "sender",
+          "type": "address"
+        },
+        {
+          "internalType": "string",
+          "name": "content",
+          "type": "string"
+        },
+        {
+          "internalType": "uint256",
+          "name": "timestamp",
+          "type": "uint256"
+        }
+      ],
+      "payable": false,
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "constant": false,
+      "inputs": [
+        {
+          "internalType": "string",
+          "name": "_content",
+          "type": "string"
+        }
+      ],
+      "name": "sendMessage",
+      "outputs": [],
+      "payable": false,
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "constant": true,
+      "inputs": [
+        {
+          "internalType": "uint256",
+          "name": "_messageId",
+          "type": "uint256"
+        }
+      ],
+      "name": "getMessage",
+      "outputs": [
+        {
+          "internalType": "address",
+          "name": "",
+          "type": "address"
+        },
+        {
+          "internalType": "string",
+          "name": "",
+          "type": "string"
+        },
+        {
+          "internalType": "uint256",
+          "name": "",
+          "type": "uint256"
+        }
+      ],
+      "payable": false,
+      "stateMutability": "view",
+      "type": "function"
+    }
+  ];
+
+        // Connect to the Ethereum network using Web3
+        let web3 = new Web3("http://localhost:7545");
+
+        // Load the contract
+        let contract = new web3.eth.Contract(contractABI, contractAddress);
+// Function to send a message
+function sendMessage() {
+            let content = document.getElementById("messageContent").value;
+            web3.eth.getAccounts()
+                .then(accounts => {
+                    let sender = accounts[0]; // Use the first account from Ganache
+                    return contract.methods.sendMessage(content).send({ from: sender });
+                })
+                .then(() => {
+                    console.log("Message sent successfully");
+                    alert("Message sent successfully");
+                    document.getElementById("messageContent").value = ""; // Clear the message input
+                    storeMessage(content); // Store message in Firebase
+
+                })
+                .catch(error => {
+                    console.error("Error sending message:", error);
+                    alert("Error sending message: " + error.message);
+                });
+        }
+
+        // Function to store a message in Firebase Realtime Database
+        function storeMessage(content) {
+            // Get a reference to the 'messages' node in the database
+            const messagesRef = database.ref('messages');
+            
+            // Push a new message object to the 'messages' node
+            messagesRef.push({
+                content: content,
+                timestamp: firebase.database.ServerValue.TIMESTAMP
+            });
+        }
+        
+    </script>
+</body>
+</html>
